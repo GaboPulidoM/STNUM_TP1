@@ -1,0 +1,488 @@
+#1. Importation de libraries
+
+import pandas as pd # Pour lire les fichiers
+import numpy as np # Pour effectuer des calculs mathématiques
+import matplotlib.pyplot as plt # Pour réaliser des graphiques
+import scipy # Pour effectuer des calculs statistiques
+from scipy.cluster.hierarchy import dendrogram, linkage # Pour calculer un dendrogramme
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.preprocessing import StandardScaler # Pour normaliser les données
+from sklearn import decomposition # Pour effectuer une ACP
+
+
+#2. Chargement des donnees et analyse descriptive
+
+variables8= ["k"+ str(i) for i in range(1,8)]
+variables64= ["k"+ str(i) for i in range(1,64)]
+painting8 = pd.read_table("/content/drive/Shareddrives/STNUM TP/painting8.txt",sep=";",decimal=".",index_col=False, names= variables8)
+painting64 = pd.read_table("/content/drive/Shareddrives/STNUM TP/painting64.txt",sep=";",decimal=".",index_col=False, names= variables64)
+Names = ["Rembrandt" + str(i) for i in range(1,41)] + ["Vangogh" + str(i) for i in range(1,45)]
+types = ["Rembrandt" for i in range(1,41)] + ["Vangogh" for i in range(1,45)]
+painting8.insert(0,"Painting", Names)
+painting8.insert(1,"Artist", types)
+painting64.insert(0,"Painting", Names)
+painting64.insert(1,"Artist", types)
+painting8["k8"] = 1-painting8.sum(axis=1)
+painting64["k64"] = 1-painting64.sum(axis=1)
+pd.options.display.max_columns= None
+pd.options.display.max_rows= None
+painting8
+
+
+var8= painting8[["k"+ str(i) for i in range(1,9)]].var(ddof=1)
+var8.to_frame(name="Variance")
+
+summary8= painting8.describe()
+summary8= summary8.transpose()
+summary64= painting64.describe()
+summary64= summary64.transpose()
+print(summary8)
+
+plt.subplots(figsize=(8,6))
+painting8.drop('Painting',axis=1).boxplot()
+plt.show()
+
+pd.plotting.scatter_matrix(painting8, figsize=(10, 6))
+plt.show()
+
+print (painting8.corr())
+
+
+
+#3. Analyse en composantes principales
+
+painting8_acp = painting8.drop(['Painting',"Artist"],axis=1)
+n_8 = painting8_acp.shape[0]
+p_8 = painting8_acp.shape[1]
+n_cp_8 = p_8
+
+painting64_acp= painting64.drop(['Painting',"Artist"],axis=1)
+n_64= painting64_acp.shape[0]  #Nombre des individus - Matrix [n,p]
+p_64 = painting64_acp.shape[1]  #Nombre de variables  - Matrix [n,p]
+n_cp_64 = p_64
+
+norm = StandardScaler()
+painting8_acp_norm = norm.fit_transform(painting8_acp)
+
+
+acp_8 = decomposition.PCA(svd_solver='full', n_components=n_cp_8)
+coord_8 = acp_8.fit_transform(painting8_acp_norm)
+
+
+val_prop_8 = (n_8-1)/n_8 * acp_8.explained_variance_
+part_inertie_expl_8 = acp_8.explained_variance_ratio_
+plt.subplots(figsize=(8, 6))
+
+plt.bar(np.arange(1, n_cp_8+1), val_prop_8)
+#plt.grid()
+plt.title('Eboulis des valeurs propres')
+plt.xlabel('Composante principale')
+plt.ylabel('Valeur propre')
+plt.show()
+
+
+plt.subplots(figsize=(8, 6))
+
+plt.bar(np.arange(1, n_cp_8+1), np.cumsum(part_inertie_expl_8))
+#plt.grid()
+plt.title("Part d'inertie expliquée cumulée")
+plt.xlabel('Composante principale')
+plt.ylabel('Pourcentage')
+plt.show()
+
+for i in range(0, n_cp_8):
+    painting8['CP' + str(i + 1)] = coord_8[:, i]
+    
+sqrt_val_prop_8 = np.sqrt(val_prop_8)
+
+cor_var_8 = np.zeros((p_8,n_cp_8))
+for i in range(n_cp_8):
+    cor_var_8[:,i] = acp_8.components_[i,:] * sqrt_val_prop_8[i]
+
+fig, ax = plt.subplots(figsize=(10, 10))
+
+for i in range(0, p_8):
+    ax.arrow(0,
+             0,
+             cor_var_8[i, 0],
+             cor_var_8[i, 1],
+             head_width=0.03,
+             head_length=0.03,
+             length_includes_head=True)
+
+    plt.text(cor_var_8[i, 0]+0.01,
+             cor_var_8[i, 1],
+             painting8.columns.values[i+2],
+            c='red')
+
+an = np.linspace(0, 2 * np.pi, 100)
+plt.plot(np.cos(an), np.sin(an))
+plt.axis('equal')
+ax.set_title('Cercle de corrélations')
+plt.axhline(y=0)
+plt.axvline(x=0)
+
+plt.show()
+
+
+
+
+fig, axes = plt.subplots(figsize=(10, 10))
+axes.set_xlim(-5,5)
+axes.set_ylim(-5,5)
+
+scatter = plt.scatter(painting8['CP1'], painting8['CP2'], s=80, c=painting8.Artist.astype('category').cat.codes)
+plt.grid()
+plt.title('Projection des individus (52%)')
+plt.xlabel('CP1 (33%)')
+plt.ylabel('CP2 (20%)')
+plt.legend(handles=scatter.legend_elements()[0],labels=["Rembrandt", "Vangogh"],title='Artist')
+"""for i in range(n_8):
+    plt.annotate(painting8.index[i],(coord_8[i,0]+0.1,coord_8[i,1]+0.1))"""
+
+plt.show()
+  
+  
+  
+norm = StandardScaler()
+painting64_acp_norm = norm.fit_transform(painting64_acp)
+
+acp_64 = decomposition.PCA(svd_solver='full', n_components=n_cp_64)
+coord_64 = acp_64.fit_transform(painting64_acp_norm)
+coord_64
+
+
+val_prop_64 = (n_64-1)/n_64 * acp_64.explained_variance_
+np.sum(val_prop_64) # Cette somme doit être égal au nombre de variables (64)
+
+part_inertie_expl_64 = acp_64.explained_variance_ratio_
+
+
+plt.subplots(figsize=(8, 6))
+plt.bar(np.arange(1, n_cp_64+1), val_prop_64)
+plt.grid()
+plt.title('Eboulis des valeurs propres')
+plt.xlabel('Composante principale')
+plt.ylabel('Valeur propre')
+plt.show()
+
+
+plt.subplots(figsize=(8, 6))
+plt.bar(np.arange(1, n_cp_64+1), np.cumsum(part_inertie_expl_64))
+#plt.grid()
+plt.title("Part d'inertie expliquée cumulée")
+plt.xlabel('Composante principale')
+plt.ylabel('Pourcentage')
+plt.show()
+
+
+Inertie= pd.DataFrame(
+    {
+        "Composant principale" : ["Composant" + str(x + 1) for x in range(n_cp_64)], 
+        "Inertie" : val_prop_64,
+        "% Inertie" : np.round(acp_64.explained_variance_ratio_ * 100),
+        "% Inertie cumulee" : np.round(np.cumsum(acp_64.explained_variance_ratio_) * 100)
+    }
+)
+Inertie
+
+
+for i in range(0, n_cp_64):
+    painting64['CP' + str(i + 1)] = coord_64[:, i]
+painting64
+
+
+sqrt_val_prop_64 = np.sqrt(val_prop_64)
+
+cor_var_64 = np.zeros((p_64,n_cp_64))
+for i in range(n_cp_64):
+    cor_var_64[:,i] = acp_64.components_[i,:] * sqrt_val_prop_64[i]
+
+cor_var1 = np.zeros((p_64,n_cp_64))
+cont=0
+for i in cor_var_64:
+  for j in range(0,1):
+    if abs(i[j])> 0.8 or abs(i[j+1]) > 0.8:  #On veut montrer le correlation le plus fortes
+      cor_var1[cont, j] = i[j]
+      cor_var1[cont, j+1]= i[j+1]
+    cont +=1
+
+fig, ax = plt.subplots(figsize=(11, 10))
+
+for i in range(0, len(cor_var1)):
+    ax.arrow(0,
+             0,
+             cor_var1[i, 0],
+             cor_var1[i, 1],
+             head_width=0.03,
+             head_length=0.03,
+             length_includes_head=True)
+    plt.text(cor_var1[i, 0]+0.03,
+             cor_var1[i, 1]+0.03,
+             painting64.drop(["Painting", "Artist"], axis=1).columns.values[i],
+             c='red')
+
+an = np.linspace(0, 2 * np.pi, 100)
+plt.plot(np.cos(an), np.sin(an))
+plt.axis('equal')
+ax.set_title('Cercle de corrélations')
+
+plt.axhline(y=0)
+plt.axvline(x=0)
+
+plt.show()
+
+
+corr_table= pd.DataFrame(cor_var_64[:,:2],columns = ["Composant 1", "Composant 2"])
+corr_table.insert(0,"Variable",painting64_acp.columns)
+corr_table
+
+fig, axes = plt.subplots(figsize=(10, 10))
+axes.set_xlim(-2,4)
+axes.set_ylim(-4,4)
+
+scatter= plt.scatter( painting64['CP1'], painting64['CP2'], s=20, c=painting64.Artist.astype('category').cat.codes, cmap='jet')
+plt.grid()
+plt.title('Projection des individus (24%)')
+plt.xlabel('CP1 (13%)')
+plt.ylabel('CP2 (11%)')
+plt.legend(handles=scatter.legend_elements()[0],labels= ["Rembrandt", "Vangogh"],title='Artist')
+# for i in range(n_64):
+#      plt.annotate(painting64.index[i],(coord_64[i,0]+0.1,coord_64[i,1]+0.1))
+plt.show()
+
+
+fig, axes = plt.subplots(figsize=(10, 10))
+axes.set_xlim(-2,4)
+axes.set_ylim(-4,4)
+plt.scatter(painting64['CP1'], painting64['CP2'], s=30)
+plt.grid()
+plt.title('Projection des individus : avec les libellés des individus')
+plt.xlabel('CP1')
+plt.ylabel('CP2')
+for i in range(n_64):
+    plt.annotate(painting64.index[i],(coord_64[i,0]+0.1,coord_64[i,1]+0.1))
+# plt.show()
+
+
+painting64_non = pd.read_table("/content/drive/Shareddrives/STNUM TP/painting64.txt",sep=";",decimal=".",index_col=False, names= variables64)
+painting64_non.insert(0,"Painting", Names)
+painting64_non.insert(1,"Artist", types)
+painting64_non["k64"] = 1-painting64_non.sum(axis=1)
+painting64_acp_non= painting64_non.drop(["Painting","Artist"], axis=1)
+
+
+var64= painting64_non[["k"+ str(i) for i in range(1,64)]].var(ddof=0)
+np.sum(var64) #Cette somme doit être égal à la somme des valeurs propes (ACP non-normée)
+
+
+acp1 = decomposition.PCA(svd_solver='full', n_components=n_cp_64)
+acp1.fit(painting64_acp_non)
+coord_non = acp1.transform(painting64_acp_non)
+
+
+val_prop_non = (n_64-1)/n_64 * acp1.explained_variance_
+part_inertie_expl_non = acp1.explained_variance_ratio_
+
+
+plt.subplots(figsize=(8, 6))
+plt.bar(np.arange(1, n_cp_64+1), val_prop_non)
+plt.grid()
+plt.title('Eboulis des valeurs propres')
+plt.xlabel('Composante principale')
+plt.ylabel('Valeur propre')
+plt.show()
+
+plt.subplots(figsize=(8, 6))
+plt.bar(np.arange(1, n_cp_64+1), np.cumsum(part_inertie_expl_non))
+#plt.grid()
+plt.title("Part d'inertie expliquée cumulée")
+plt.xlabel('Composante principale')
+plt.ylabel('Pourcentage')
+plt.show()
+
+
+Inertie_non= pd.DataFrame(
+    {
+        "Composant principale" : ["Composant" + str(x + 1) for x in range(n_cp_64)], 
+        "Inertie" : val_prop_non,
+        "% Inertie" : np.round(part_inertie_expl_non * 100),
+        "% Inertie cumulee" : np.round(np.cumsum(part_inertie_expl_non) * 100)
+    }
+)
+np.sum(Inertie_non["Inertie"])
+Inertie_non
+
+
+for i in range(0, n_cp_64):
+    painting64_non['CP' + str(i + 1)] = coord_non[:, i]
+# painting64_non
+
+sqrt_val_prop_non = np.sqrt(val_prop_non)
+
+cor_var_non = np.zeros((p_64,n_cp_64))
+for i in range(n_cp_64):
+    cor_var_non[:,i] = acp1.components_[i,:] * sqrt_val_prop_non[i]
+
+fig, ax = plt.subplots(figsize=(10, 10))
+
+for i in range(0, p_64):
+    ax.arrow(0,
+             0,
+             cor_var_non[i, 0],
+             cor_var_non[i, 1],
+             head_width=0.015,
+             head_length=0.015,
+             length_includes_head=True)
+
+    plt.text(cor_var_non[i, 0]+0.01,
+             cor_var_non[i, 1]-0.02,
+             painting64_non.drop(["Painting", "Artist"], axis=1).columns.values[i],
+            c='green')
+
+an = np.linspace(0, 2 * np.pi, 100)
+plt.plot(np.cos(an), np.sin(an))
+plt.axis('equal')
+ax.set_title('Cercle de corrélations')
+
+plt.axhline(y=0)
+plt.axvline(x=0)
+
+plt.show()
+
+corr_table_non= pd.DataFrame(cor_var_non[:,:2],columns = ["Composant 1", "Composant 2"])
+corr_table_non.insert(0,"Variable",painting64_acp.columns)
+corr_table_non
+
+fig, axes = plt.subplots(figsize=(10, 10))
+axes.set_xlim(-0.5,1)
+axes.set_ylim(-0.5,1)
+
+scatter_non= plt.scatter( painting64_non['CP1'], painting64_non['CP2'], s=20, c=painting64_non.Artist.astype('category').cat.codes, cmap='jet')
+plt.grid()
+plt.title('Projection des individus (76%)')
+plt.xlabel('CP1 (67%)')
+plt.ylabel('CP2 (9%)')
+plt.legend(handles=scatter.legend_elements()[0],labels= ["Rembrandt", "Vangogh"],title='Artist')
+# for i in range(n):
+#     plt.annotate(painting64.index[i],(coord[i,0]+0.1,coord[i,1]+0.1))
+plt.show()
+
+
+#4. Clustering sur le jeu de données painting 8
+painting8_cluster = painting8.drop(['Painting',"Artist"],axis=1)
+n = painting8_cluster.shape[0]
+p = painting8_cluster.shape[1]
+norm = StandardScaler()
+painting8_cluster_norm = norm.fit_transform(painting8_cluster)
+
+def plot_dendrogram(model, **kwargs):
+    # Create linkage matrix and then plot the dendrogram
+
+    # create the counts of samples under each node
+    counts = np.zeros(model.children_.shape[0])
+    print(model.children_)
+    n_samples = len(model.labels_)
+    for i, merge in enumerate(model.children_):
+        current_count = 0
+        for child_idx in merge:
+            if child_idx < n_samples:
+                current_count += 1  # leaf node
+            else:
+                current_count += counts[child_idx - n_samples]
+        counts[i] = current_count
+
+    linkage_matrix = np.column_stack([model.children_, model.distances_, counts]).astype(float)
+
+    # Plot the corresponding dendrogram
+    dendrogram(linkage_matrix, **kwargs)
+    
+    
+    cah_single = AgglomerativeClustering(distance_threshold=0,
+                                     affinity='euclidean',
+                                     linkage='single',
+                                     n_clusters=None).fit(painting8_cluster_norm)
+
+plt.subplots(figsize=(20, 20))
+
+plt.title("Single linkage")
+# plot the top three levels of the dendrogram
+plot_dendrogram(cah_single, truncate_mode="level", p=10)
+plt.show()
+
+
+cah_complete = AgglomerativeClustering(distance_threshold=0,
+                                       affinity='euclidean',
+                                       linkage='complete',
+                                       n_clusters=None).fit(painting8_cluster_norm)
+
+plt.subplots(figsize=(10, 6))
+
+plt.title("Complete linkage")
+# plot the top three levels of the dendrogram
+plot_dendrogram(cah_complete, truncate_mode="level", p=10)
+plt.show()
+
+cah_average = AgglomerativeClustering(distance_threshold=0,
+                                      affinity='euclidean',
+                                      linkage='average',
+                                      n_clusters=None).fit(painting8_cluster_norm)
+
+plt.subplots(figsize=(10, 6))
+
+plt.title("Average lainage")
+# plot the top three levels of the dendrogram
+plot_dendrogram(cah_average, truncate_mode="level", p=10)
+plt.show()
+
+
+cah_ward = AgglomerativeClustering(distance_threshold=0,
+                                   affinity='euclidean',
+                                   linkage='ward',
+                                   n_clusters=None).fit(painting8_cluster_norm)
+
+plt.subplots(figsize=(10, 6))
+
+plt.title("Ward")
+# plot the top three levels of the dendrogram
+plot_dendrogram(cah_ward, truncate_mode="level", p=10)
+plt.show()
+
+
+cah_ward_non = AgglomerativeClustering(distance_threshold=0,
+                                   affinity='euclidean',
+                                   linkage='ward',
+                                   n_clusters=None).fit(painting8_cluster)
+
+plt.subplots(figsize=(10, 6))
+
+plt.title("Ward non normalisée")
+# plot the top three levels of the dendrogram
+plot_dendrogram(cah_ward_non, truncate_mode="level", p=10)
+plt.show()
+
+plt.subplots(figsize=(10, 6))
+
+plt.vlines(np.arange(2, n+1), 0, np.flip(np.sort(cah_ward.distances_)), linewidth=10)
+plt.grid()
+plt.title("Gain d'inertie inter-classes lors du passage de (k-1) à k classes")
+plt.xlabel("k")
+plt.ylabel("Indice d'aggrégation")
+plt.show()
+
+plt.subplots(figsize=(10, 6))
+
+plt.vlines(np.arange(2, n+1), 0, np.flip(np.sort(cah_ward_non.distances_)), linewidth=10)
+plt.grid()
+plt.title("Gain d'inertie inter-classes lors du passage de (k-1) à k classes_non normalisée")
+plt.xlabel("k")
+plt.ylabel("Indice d'aggrégation")
+plt.show()
+
+cah_ward = AgglomerativeClustering(affinity='euclidean',
+                                   linkage='ward',
+                                   n_clusters=2).fit(painting8_cluster)
+painting8['Classes_CAH'] = cah_ward.labels_
+
+print(painting8.sort_values('Classes_CAH')['Classes_CAH'].to_string())
+print(painting8.to_string())
