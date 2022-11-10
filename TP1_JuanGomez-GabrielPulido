@@ -1,3 +1,4 @@
+```Python
 #1. Importation de libraries
 
 import pandas as pd # Pour lire les fichiers
@@ -486,3 +487,5 @@ painting8['Classes_CAH'] = cah_ward.labels_
 
 print(painting8.sort_values('Classes_CAH')['Classes_CAH'].to_string())
 print(painting8.to_string())
+
+```
